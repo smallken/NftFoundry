@@ -1,7 +1,7 @@
 pragma solidity ^0.8.13;
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Nonces.sol";
-
+// @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 // 创建新的NFT
 contract MyERC721 is ERC721URIStorage, Nonces{
     // using Counters for Counters.Counter;
