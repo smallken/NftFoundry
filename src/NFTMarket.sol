@@ -146,7 +146,7 @@ contract NFTMarket is IERC721Receiver{
             path = new address[](2);
             path[0] = WETH;
             path[1] = address(token);
-           amounts = swapRouter.{value: amountIn}(amountOutMin, path, tokenSender, deadline);
+           amounts = swapRouter.swapExactETHForTokens{value: amountIn}(amountOutMin, path, tokenSender, deadline);
         } else {
             // 币与币转，本该判断是否有path，这里默认没有
             path[0] = address(tokenIn);
