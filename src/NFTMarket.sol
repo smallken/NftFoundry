@@ -35,8 +35,21 @@ contract NFTMarket is IERC721Receiver{
     mapping(uint => Detail) public list;
     // 分别代表下架，上架，已售
      enum Status {OffSale, OnSale, Sold}
-     // Owner
-    //  mapping(uint => address) public owner;
+     // NFT交易费
+    uint256 constant FEE_RATE = 3;  // 百分之0.3
+    uint256 constant FEE_DECIMALS = 1000;  // 小数点位数
+    // 字段：总质押量
+    uint256 totalDeposit;
+    // fee总量
+    uint256 totalFee;
+    // 每个账户可得质押 totalFee/totalDeposit
+    uint256 eachFee;
+    // 每个账户的质押量
+    mapping(address => uint) eachDeposit;
+    // 每个账户的fee 
+    mapping(address => uint) feeAddress;    
+    // 每个账户质押得到的fee
+    mapping(address => uint) addressGetFees;
     constructor (address nftAddress, address tokenAddress, address uniSwapRouter, address _WETH) {
         nft = IMyERC721(nftAddress);
         token = IERC20(tokenAddress);
@@ -88,27 +101,28 @@ contract NFTMarket is IERC721Receiver{
     }
 
     function buyNFT(uint tokenID, uint amount) public {
-        // 必须是owner才能够修改
-        // 买卖的话可以用ERC721调。但怎么调呢？要用IERC721Receiver
-        // IMyERC721(address).safeTransferFrom(from, to, tokenID);
-        // require(msg.value > amount, "balance is not enough");
+        uint fee = calculateFee(amount);
         if (isOnSale[tokenID] != Status.OnSale) {
             revert notOnSaled();
         }
         if (!tokenExit[tokenID]) revert noThisNFT();
         // 判断加钱是否少于上架加钱
-        // address originalOwner = nft.ownerOf(tokenID); 
         if (amount < list[tokenID].price) {
             revert noEnoughBalance();
         }
         nft.safeTransferFrom(address(this), msg.sender, tokenID);
-        // token.approve( list[tokenID].owner, amount);
-        token.approve(address(this), amount);
-        // 不用判断是否有足够的ammout，erc20会去判断
-        token.safeTransferFrom(msg.sender, list[tokenID].owner, amount);
+        // 转交易费
+        feeAmount += fee;
+        token.approve(address(this), total);
+        token.safeTransferFrom(msg.sender, list[tokenID].owner, amount-fee);
+        token.safeTransferFrom(msg.sender, address(this), fee);
         isOnSale[tokenID] = Status.Sold;
-        // owner[tokenID] = msg.sender;
         updateList(tokenID, msg.sender, amount);
+    }
+
+    function calculateFee(uint256 amount) public pure returns (uint256) {
+        uint256 fee = (amount * FEE_RATE) / FEE_DECIMALS;
+        return fee;
     }
 
     // 下架
@@ -171,6 +185,61 @@ contract NFTMarket is IERC721Receiver{
         console.logBytes32(a);
         return a;
     }
-    
+
+    function depositeEth(uint ethAmount, uint amountTokenDesired, uint amountTokenMin, uint amountETHMin, address sender , uint deadline) public {
+        // 存ETH，获得Fee
+        swapRouter.addLiquidityETH{value: ethAmount}(address(token), amountTokenDesired, amountTokenMin, amountETHMin, sender, deadline);
+        addDepositCountEarn(ethAmount, sender);
+        caculateFee(0, ethAmount, true);
+    }
+
+    function removeEth(uint liquidity, uint amountAMin, uint amountBMin,address to, uint deadline) public {
+        (uint amountToken, uint amountETH) = swapRouter.removeLiquidityETH(token, liquidity, amountAMin, amountBMin, to, deadline);
+        caculateFee(0, amountETH, false);
+    }
+
+    /**
+     * 公式：E = A * (Fee/totalStake)
+     * aAcount: a账户的质押数
+     * E(a账户) = E * (a/totalStake)
+     * earn = a* (E - E(a));
+     */
+    // 算出E，只要fee和totalStake变了就要算。
+    function caculateFee(uint feeIncread, uint stakeChanged, bool isCreased) public {
+        if (isCreased) {
+            totalFee += feeIncread;
+            totalDeposit += stakeChanged;
+        } else {
+            totalFee -= feeIncread;
+            totalDeposit -= stakeChanged;
+        }
+        eachFee = totalFee / totalDeposit ;
+    }
+    // 提取fee
+    function withdrawFee(address withdrawer) public {
+        uint256 acoumtFeeLast = feeAddress(withdrawer); 
+        require(acoumtFeeLast > 0, "balance must bigger than 0!");
+        
+    } 
+    // 质押和非质押都算用户所得
+    function addDepositCountEarn(uint ethAmount, address depositer, bool isCreased) returns(){
+ 	// 当有人买，就会有fee，这样就要把fee按等份分给质押人
+    // 字段：总质押量totalDeposit，fee总量：totalFee,每个账户可得质押eachFee=totalFee/totalDeposit，
+    // 每个账户的质押量：eachDeposit mapping <address uint>, 每个账户的：eachFee mapping<address uint>获得的fee（token)
+        uint lastDepoist = eachDeposit(depositer);
+        if (isCreased) {
+            eachDeposit(depositer) += ethAmount;
+        } else {
+            eachDeposit(depositer) -= ethAmount;
+        }
+        uint256 acoumtFeeLast = feeAddress(depositer); 
+        if (acoumtFeeLast == 0) {
+            feeAddress(depositer) = ethAmount/totalDeposit * eachFee ;
+        } else {
+            uint eran = lastDepoist * (eachFee - acoumtFeeLast);
+            addressGetFees += earn;
+        }
+    }
+
 
 }
