@@ -42,19 +42,18 @@ contract NFTMarket is IERC721Receiver{
     uint256 totalDeposit;
     // fee总量
     uint256 totalFee;
-    // 每个账户可得质押 totalFee/totalDeposit
-    uint256 eachFee;
-    // 每个账户的质押量
-    mapping(address => uint) eachDeposit;
-    // 每个账户的fee 
-    mapping(address => uint) feeAddress;    
-    // 每个账户质押得到的fee
-    mapping(address => uint) addressGetFees;
+    mapping(address => uint) earnToAddress;
+    mapping(address => uint) depoisterAmount;
+    // 每份E：fee/totalDeposit
+    uint EachFeePerStake;
+    // 保存eran到数组，以便遍历
+    address[] earnList;
     constructor (address nftAddress, address tokenAddress, address uniSwapRouter, address _WETH) {
         nft = IMyERC721(nftAddress);
         token = IERC20(tokenAddress);
         swapRouter = IUniswapV2Router02(uniSwapRouter);
         WETH = _WETH;
+        
     }
     error notOnSaled();
     error isOnSaled();
@@ -112,8 +111,9 @@ contract NFTMarket is IERC721Receiver{
         }
         nft.safeTransferFrom(address(this), msg.sender, tokenID);
         // 转交易费
-        feeAmount += fee;
-        token.approve(address(this), total);
+        totalFee += fee;
+        if (totalDeposit > 0) EachFeePerStake = totalFee / totalDeposit;
+        token.approve(address(this), amount);
         token.safeTransferFrom(msg.sender, list[tokenID].owner, amount-fee);
         token.safeTransferFrom(msg.sender, address(this), fee);
         isOnSale[tokenID] = Status.Sold;
@@ -189,57 +189,42 @@ contract NFTMarket is IERC721Receiver{
     function depositeEth(uint ethAmount, uint amountTokenDesired, uint amountTokenMin, uint amountETHMin, address sender , uint deadline) public {
         // 存ETH，获得Fee
         swapRouter.addLiquidityETH{value: ethAmount}(address(token), amountTokenDesired, amountTokenMin, amountETHMin, sender, deadline);
-        addDepositCountEarn(ethAmount, sender);
-        caculateFee(0, ethAmount, true);
+        addDepositCountEarn(ethAmount, sender, true);
     }
 
     function removeEth(uint liquidity, uint amountAMin, uint amountBMin,address to, uint deadline) public {
         (uint amountToken, uint amountETH) = swapRouter.removeLiquidityETH(token, liquidity, amountAMin, amountBMin, to, deadline);
-        caculateFee(0, amountETH, false);
+        addDepositCountEarn(amountETH, to, false);
     }
 
-    /**
-     * 公式：E = A * (Fee/totalStake)
-     * aAcount: a账户的质押数
-     * E(a账户) = E * (a/totalStake)
-     * earn = a* (E - E(a));
-     */
-    // 算出E，只要fee和totalStake变了就要算。
-    function caculateFee(uint feeIncread, uint stakeChanged, bool isCreased) public {
-        if (isCreased) {
-            totalFee += feeIncread;
-            totalDeposit += stakeChanged;
-        } else {
-            totalFee -= feeIncread;
-            totalDeposit -= stakeChanged;
-        }
-        eachFee = totalFee / totalDeposit ;
-    }
     // 提取fee
     function withdrawFee(address withdrawer) public {
-        uint256 acoumtFeeLast = feeAddress(withdrawer); 
+        uint acoumtFeeLast = earnToAddress[withdrawer];
         require(acoumtFeeLast > 0, "balance must bigger than 0!");
-        
+        token.transferFrom(address(this), withdrawer, acoumtFeeLast);
+        earnToAddress[withdrawer] = 0;
+        for (uint i = 0; i < earnList.length; i++) {
+            if (earnList[i] == withdrawer) {
+                earnList[i] == earnList[earnList.length-1];
+                earnList.pop();
+                break;
+            }
+        }
     } 
     // 质押和非质押都算用户所得
-    function addDepositCountEarn(uint ethAmount, address depositer, bool isCreased) returns(){
- 	// 当有人买，就会有fee，这样就要把fee按等份分给质押人
-    // 字段：总质押量totalDeposit，fee总量：totalFee,每个账户可得质押eachFee=totalFee/totalDeposit，
-    // 每个账户的质押量：eachDeposit mapping <address uint>, 每个账户的：eachFee mapping<address uint>获得的fee（token)
-        uint lastDepoist = eachDeposit(depositer);
+    function addDepositCountEarn(uint ethAmount, address depositer, bool isCreased) internal{
         if (isCreased) {
-            eachDeposit(depositer) += ethAmount;
+            depoisterAmount[depositer] += ethAmount;
         } else {
-            eachDeposit(depositer) -= ethAmount;
+            depoisterAmount[depositer] -= ethAmount;
         }
-        uint256 acoumtFeeLast = feeAddress(depositer); 
-        if (acoumtFeeLast == 0) {
-            feeAddress(depositer) = ethAmount/totalDeposit * eachFee ;
-        } else {
-            uint eran = lastDepoist * (eachFee - acoumtFeeLast);
-            addressGetFees += earn;
+        // 遍历Map，把eran都要算出来
+        if (totalDeposit > 0 ) EachFeePerStake = totalFee/totalDeposit;
+        if (earnList.length > 0 ){
+            for (uint i = 0; i < earnList.length; i++) {
+                earnToAddress[earnList[i]] += depoisterAmount[earnList[i]] * EachFeePerStake;
+            }
         }
     }
-
 
 }
