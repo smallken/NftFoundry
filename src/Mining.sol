@@ -12,6 +12,9 @@ contract Mining {
         lastBlockNumber = block.number;
     }
 
-    
+    // 质押ETH获得token,每个区块得到10个token
+    // function depositeEthAndGetToken(address depositer, uint amount, ) public {
+        
+    // }
 
 }
