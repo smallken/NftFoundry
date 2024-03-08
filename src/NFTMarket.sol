@@ -188,12 +188,12 @@ contract NFTMarket is IERC721Receiver{
 
     function depositeEth(uint ethAmount, uint amountTokenDesired, uint amountTokenMin, uint amountETHMin, address sender , uint deadline) public {
         // 存ETH，获得Fee
-        swapRouter.addLiquidityETH{value: ethAmount}(address(token), amountTokenDesired, amountTokenMin, amountETHMin, sender, deadline);
-        addDepositCountEarn(ethAmount, sender, true);
+        (uint amountToken, uint amountETH, ) = swapRouter.addLiquidityETH{value: ethAmount}(address(token), amountTokenDesired, amountTokenMin, amountETHMin, sender, deadline);
+        addDepositCountEarn(amountETH, sender, true);
     }
 
     function removeEth(uint liquidity, uint amountAMin, uint amountBMin,address to, uint deadline) public {
-        (uint amountToken, uint amountETH) = swapRouter.removeLiquidityETH(token, liquidity, amountAMin, amountBMin, to, deadline);
+        (uint amountToken, uint amountETH) = swapRouter.removeLiquidityETH(address(token), liquidity, amountAMin, amountBMin, to, deadline);
         addDepositCountEarn(amountETH, to, false);
     }
 
