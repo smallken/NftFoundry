@@ -9,12 +9,14 @@ import "../src/MyERC721.sol";
 import "../src/uniswpV2/WETH9.sol";
 import "../src/uniswpV2/UniswapV2Router02.sol";
 import "../src/uniswpV2/UniswapV2Factory.sol";
+import "../src/GetPrice.sol";
 
 contract TestNFTMarket is Test {
     NFTMarket public nftMarket;
     MyEIP2612 public myEIP2612;
     MyERC721 public myERC721;
     WETH9 public weth;
+    GetPrice public linkGetPrice;
     enum Status {OffSale, OnSale, Sold}
     address player = makeAddr("player");
      // 定义admin
@@ -27,9 +29,10 @@ contract TestNFTMarket is Test {
                 myEIP2612 = new MyEIP2612("Dragon", "DRG");
                 myERC721 = new MyERC721();
                 weth = new WETH9();
+
                 factory = new UniswapV2Factory(admin);
                 router = new UniswapV2Router02(address(factory), address(weth));
-                nftMarket = new NFTMarket(address(myERC721), address(myEIP2612), address(router), address(weth));
+                nftMarket = new NFTMarket(address(myERC721), address(myEIP2612), address(router), address(weth), address(linkGetPrice));
                 // 这是给admin转myEIP2612的代币，单位都是ether
                 deal(address(myEIP2612), admin, 10000 ether);
                 deal(address(weth), admin, 10000 ether);
@@ -117,6 +120,12 @@ contract TestNFTMarket is Test {
         //  address owner2 = myERC721.ownerOf(nftID);
         // console.log("owner2:",owner2);
         // assertEq(myERC721.ownerOf(nftID), player);
+        vm.stopPrank();
+    }
+
+    function testGetPrice() public {
+        vm.startPrank(player);
+        linkGetPrice.getLatestPrice();
         vm.stopPrank();
     }
 }

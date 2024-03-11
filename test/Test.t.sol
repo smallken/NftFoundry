@@ -1,6 +1,7 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "../lib/forge-std/src/Test.sol";
+import "../src/GetPrice.sol";
 
 contract CounterTest is Test {
     // Counter public counter;
@@ -17,5 +18,10 @@ contract CounterTest is Test {
         // emit log("re:",re);
     }
 
+    function testGetPrice() public{
+        // uint256 i = 17145875197393345000000000000000000000 * 1 ether;
 
+        console.log("i:");
+        // console.log(i);
+    }
 }

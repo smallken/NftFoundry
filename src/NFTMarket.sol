@@ -14,6 +14,9 @@ interface IMyERC721 {
     function ownerOf(uint) external returns (address);
     function approve(address, uint256) external ;
 } 
+interface IGetPrice {
+    function getLatestPrice() external returns(uint);
+}
 contract NFTMarket is IERC721Receiver{
 
     IMyERC721 public nft;
@@ -21,6 +24,7 @@ contract NFTMarket is IERC721Receiver{
     using SafeERC20 for IERC20; 
     IUniswapV2Router02 public swapRouter;
     address internal immutable WETH;
+    address internal linkOracl;
     // using的要for类型
     // 是否上架
     mapping(uint => Status) public isOnSale;
@@ -48,11 +52,12 @@ contract NFTMarket is IERC721Receiver{
     uint EachFeePerStake;
     // 保存eran到数组，以便遍历
     address[] earnList;
-    constructor (address nftAddress, address tokenAddress, address uniSwapRouter, address _WETH) {
+    constructor (address nftAddress, address tokenAddress, address uniSwapRouter, address _WETH, address _linkOracl) {
         nft = IMyERC721(nftAddress);
         token = IERC20(tokenAddress);
         swapRouter = IUniswapV2Router02(uniSwapRouter);
         WETH = _WETH;
+        linkOracl = _linkOracl;
         
     }
     error notOnSaled();
@@ -225,6 +230,11 @@ contract NFTMarket is IERC721Receiver{
                 earnToAddress[earnList[i]] += depoisterAmount[earnList[i]] * EachFeePerStake;
             }
         }
+    }
+
+    function getPrice() public returns (uint){
+        uint price = IGetPrice(linkOracl).getLatestPrice();
+        console.log("price:", price);
     }
 
 }
